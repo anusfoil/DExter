@@ -1,0 +1,34 @@
+gpus: [0]
+epochs: 400
+learning_rate: 5e-5
+pretrained_path: 'artifacts/checkpoint/targetgen_noise-lw11111-len200-beta0.02-steps1000-epsilon-TransferFalse-ssfrac1-L12-C768-cfdg_ddpm-w=1.2-p=0.1-k=3-dia=2-4/last-v1.ckpt'
+seg_len: 200
+overlap: 10
+pin_memory: True
+random_seed: 13
+condition_eval: False
+drop_c_con: True
+
+train_target: 'gen_noise'
+
+score_path: "../Datasets/vienna4x22/musicxml/Chopin_op10_no3.musicxml"
+output_path: "inference_out/test.mid"
+
+
+test:
+    sample_steps_frac: 1
+    transfer: False
+        
+trainer:
+    gpus: ${gpus}
+    
+
+defaults:
+    - model: ClassifierFreeDenoiser #  DenoiserUnet or ClassifierFreeDenoiser
+    - task: classifierfree_diffusion
+
+
+hydra:  
+  output_subdir: null  
+  run:  
+    dir: .

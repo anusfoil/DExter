@@ -1,0 +1,5 @@
+score_path,split
+score_path,split
+../Datasets/vienna4x22/musicxml/Chopin_op10_no3.musicxml,Test
+../Datasets/vienna4x22/musicxml/Chopin_op38.musicxml,Train
+../Datasets/vienna4x22/musicxml/Schubert_D783_no15.musicxml,Train

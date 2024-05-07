@@ -1,0 +1,29 @@
+dataset_means:  [0.7063542604446411, 0.4756112396717071, -0.011089393869042397, 0.6265323758125305, 0.24988953769207]
+dataset_stds: [2.0590381622314453, 0.15276259183883667, 0.6368748545646667, 1.2729265689849854, 0.15391376614570618]
+samples_root: 'artifacts/samples'
+lr: ${learning_rate}
+drop_c_con: ${drop_c_con}
+eval_starting_epoch: 0
+timesteps: 1000
+loss_type: 'l1'
+loss_keys:
+    - 'diffusion_loss'
+    - 'recon_tempo_loss'
+    - 'recon_velocity_loss'
+    - 'recon_timing_loss'
+    - 'recon_duration_loss'
+    - 'recon_pedal_loss'
+loss_weight: [1, 1, 1, 1, 1]  
+recon_loss_weight: 0.2   # the weight in comparison to the diffusion loss
+beta_start: 0.0001
+beta_end: 0.02
+training:
+    mode: 'epsilon' # either 'x_0' or epsilon
+    target: ${train_target}
+sampling:
+    type: 'cfdg_ddpm'
+    w: 1.2
+sample_steps_frac: ${test.sample_steps_frac}
+transfer: ${test.transfer}
+condition_eval: ${condition_eval}
+valid_fraction: 0.01

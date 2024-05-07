@@ -1,0 +1,16 @@
+../Datasets/pianodata-master/xml/chopin_op35_Mv3.xml 
+../Datasets/asap-dataset-alignment/Chopin/Scherzos/31/xml_score.musicxml 
+../Datasets/asap-dataset-alignment/Ravel/Gaspard_de_la_Nuit/1_Ondine/xml_score.musicxml 
+../Datasets/asap-dataset-alignment/Beethoven/Piano_Sonatas/23-1/LiuC02M_note_alignments/note_alignment.tsv 
+../Datasets/asap-dataset-alignment/Scriabin/Sonatas/5/xml_score.musicxml 
+../Datasets/asap-dataset-alignment/Chopin/Etudes_op_25/2/xml_score.musicxml 
+../Datasets/ATEPP-1.1/Frederic_Chopin/Nocturne_No.13_in_C_minor,_Op._48_No._1/score.xml 
+../Datasets/ATEPP-1.1/Frederic_Chopin/24_Preludes,_Op._28/No._7_in_A_Major:_Andantino/Prlude_Opus_28_No._7_in_A_Major.mxl 
+../Datasets/asap-dataset-alignment/Chopin/Etudes_op_10/2/KaiRuiR06.mid
+../Datasets/asap-dataset-alignment/Beethoven/Piano_Sonatas/26-1/MorozovY02.mid
+../Datasets/ATEPP-1.1/Franz_Schubert/Piano_Sonata_No.13_in_A,_D.664/3._Allegro/03989.mid
+../Datasets/ATEPP-1.1/Frederic_Chopin/12_Etudes,_Op._25/No._12_in_C_Minor/09705.mid
+../Datasets/ATEPP-1.1/Frederic_Chopin/24_Preludes,_Op._28/No._17_in_A-Flat_Major:_Allegretto/10306.mid
+../Datasets/ATEPP-1.1/Frederic_Chopin/Ballade_No._2_in_F_Major,_Op._38/11590.mid
+../Datasets/ATEPP-1.1/Frederic_Chopin/Barcarolle_in_F-Sharp_Major,_Op._60/11395.mid
+../Datasets/ATEPP-1.1/Frederic_Chopin/Piano_Sonata_No.2_in_B_flat_minor,_Op.35/4._Finale_(Presto)/10079.mid

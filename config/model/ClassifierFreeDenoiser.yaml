@@ -1,0 +1,19 @@
+model:
+  name: 'ClassifierFreeDenoiser'
+  args:
+      residual_channels: 768
+      unconditional: False
+      condition: 'fixed' # either trainable_score or fixed
+      p_codec_rows: 5
+      s_codec_rows: 4
+      c_codec_rows: 7
+      seg_len: ${seg_len}
+      residual_layers: 12
+      kernel_size: 3
+      dilation_base: 2
+      dilation_bound: 4
+      cond_dropout: 0.1
+      norm_args:
+      - 0
+      - 1
+      - 'rowwise'    

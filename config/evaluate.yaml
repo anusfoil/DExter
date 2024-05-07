@@ -1,0 +1,50 @@
+renderer: "diff"  # "diff", "basismixer", "scoreperformer", "virtuosonet"
+gpus: [0]
+epochs: 400
+learning_rate: 5e-5
+renderer_path: /homes/hz009/Research/basismixer/bin/render_performance.py  # basis mixer renderer path
+# pretrained_path: 'artifacts/checkpoint/targetgen_noise-lw11111-len200-beta0.02-steps1000-epsilon-TransferTrue-ssfrac0.75-L12-C512-cfdg_ddpm-w=1.2-p=0.1-k=3-dia=2-4/last.ckpt'
+# pretrained_path: 'artifacts/checkpoint/targetgen_noise-lw11111-len200-beta0.02-steps1000-epsilon-TransferFalse-ssfrac1-L12-C768-cfdg_ddpm-w=1.2-p=0.1-k=3-dia=2-4/last-v1.ckpt'
+pretrained_path: 'artifacts/checkpoint/targetgen_noise-lw11111-len200-beta0.02-steps1000-epsilon-TransferFalse-ssfrac1-cfdg_ddpm-w=1.2-dim=48/last-v1.ckpt'
+data_root: '/import/c4dm-scratch-02/DiffPerformer/'
+seg_len: 200
+pin_memory: True
+random_seed: 13
+condition_eval: False
+
+train_target: 'gen_noise' # 'gen_noise' or 'transfer' or 'gen_noise+transfer' or 'gen_null'
+
+test:
+    sample_steps_frac: 1
+    transfer: False
+
+dataloader:
+    smoothed: False
+    mixup: True
+    num_data: 1600   # amount of samples for evaluation
+    train:
+        batch_size: 16
+        shuffle: True    
+        pin_memory: ${pin_memory}
+        prefetch_factor: 2
+    val:
+        batch_size: 16
+        num_workers: 1
+        shuffle: False
+        pin_memory: ${pin_memory}
+        
+        
+trainer:
+    gpus: ${gpus}
+    
+
+
+defaults:
+    - model: DenoiserUnet #  DenoiserUnet or ClassifierFreeDenoiser
+    - task: classifierfree_diffusion
+
+
+hydra:  
+  output_subdir: null  
+  run:  
+    dir: .

@@ -1,0 +1,64 @@
+gpus: [0]
+val_freq: 10
+learning_rate: 5e-5
+epochs: 400
+download: False
+load_trained: False
+test_only: False
+pretrained_path: 'artifacts/checkpoint/targettransfer-lw11111-len200-beta0.2-steps1000-epsilon-TransferTrue-ssfrac0.75-L12-C512-cfdg_ddpm-w=1.2-p=0.1-k=3-dia=2-4/last-v2.ckpt'
+data_root: '/import/c4dm-scratch-02/DiffPerformer/'
+seg_len: 200
+pin_memory: True
+random_seed: 13
+condition_eval: False
+drop_c_con: False
+
+train_target: 'gen_noise' # 'gen_noise' or 'transfer' 
+
+test:
+    sample_steps_frac: 1
+    transfer: False
+
+dataloader:
+    smoothed: False
+    mixup: True
+    train:
+        batch_size: 256
+        num_workers: 40
+        shuffle: True    
+        pin_memory: ${pin_memory}
+        prefetch_factor: 2
+        persistent_workers: True
+    val:
+        batch_size: 16
+        num_workers: 4
+        shuffle: True
+        pin_memory: ${pin_memory}
+        
+        
+trainer:
+    gpus: ${gpus}
+    max_epochs: ${epochs}
+    check_val_every_n_epoch: ${val_freq}
+    
+modelcheckpoint:
+    # dirpath: 'artifacts/checkpoint'
+    monitor: 'Val/tempo_vel_loss'
+    filename: '{epoch:02d}e-tv_loss{Train/tv_loss:.2f}'
+    # filename: '{epoch:02d}e-diffusion_loss{Train/diffusion_loss:.2f}'
+    save_top_k: 1
+    save_last: True
+    mode: "min"
+    auto_insert_metric_name: False    
+    
+
+
+defaults:
+    - model: ClassifierFreeDenoiser # DenoiserUnet or ClassifierFreeDenoiser
+    - task: classifierfree_diffusion
+
+
+hydra:  
+  output_subdir: null  
+  run:  
+    dir: .
