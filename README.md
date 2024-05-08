@@ -1,6 +1,6 @@
 # DExter: Learning and Controlling Performance Expression with Diffusion Models
 
-[![arXiv Paper](https://img.shields.io/badge/arXiv-Paper-brightgreen)]() [![Colab Demo](https://img.shields.io/badge/Colab-Demo-orange)](https://colab.research.google.com/drive/1WAvdF3SOEIyy8qIQficFqfiRGOWBKd2?usp=sharing)
+[![arXiv Paper](https://img.shields.io/badge/arXiv-Paper-brightgreen)]() [![Colab Demo](https://img.shields.io/badge/Colab-Demo-orange)](https://colab.research.google.com/drive/1WAvdF3SOEIyy8qIQficFqfiRGOWBKd2C?usp=sharing)
 
 
 Code repository for DExter: a Diffusion-based Expressive performance generat(o)r, where we show samples of conditional and unconditioned rendering with perceptual-inspired features, as well as controlled ablation studies. The name also echos “dexterity”, one of the crucial qualities of human masters’ hands that enables the most fine-grained control over individual notes, which our models strive to achieve as well. 
@@ -33,7 +33,7 @@ Partitura versioning: This project use a slightly modified version of performanc
 
 # Rendering on custom score
 
-Inference on custom score can be done either in commandline or in the [Colab notebook](https://colab.research.google.com/drive/1WAvdF3SOEIyy8qIQficFqfiRGOWBKd2?usp=sharing). Note that, current inference script only support the mid-level-condition-free (i.e. only use the given score as conditioning) since mid-level features are only obtained for our dataset with audio tracks. Rendering with inferred mid-level features will come soon. 
+Inference on custom score can be done either in commandline or in the [Colab notebook](https://colab.research.google.com/drive/1WAvdF3SOEIyy8qIQficFqfiRGOWBKd2C?usp=sharing). Note that, current inference script only support the mid-level-condition-free (i.e. only use the given score as conditioning) since mid-level features are only obtained for our dataset with audio tracks. Rendering with inferred mid-level features will come soon. 
 ```
 python inference.py score_path="/path/to/your/musicxml" pretrained_path='/path/to/checkpoint' output_path='/your/output/path'
 ```
