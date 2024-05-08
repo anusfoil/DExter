@@ -11,7 +11,6 @@ import numpy as np
 import numpy.lib.recfunctions as rfn
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-import hook
 
 import torch
 torch.set_printoptions(sci_mode=False)

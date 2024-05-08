@@ -17,7 +17,6 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
 from utils import *
 from renderer import Renderer
-import hook
 
 def eval_renderer(cfg, val_loader):
     """run the evaluation set on other renderer for comparison

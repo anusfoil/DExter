@@ -14,7 +14,6 @@ import numpy.lib.recfunctions as rfn
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
 from tqdm import tqdm
-import hook
 
 
 VIENNA_MATCH_DIR = "../Datasets/vienna4x22/match/"

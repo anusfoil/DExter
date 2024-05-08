@@ -14,7 +14,6 @@ import seaborn as sns
 import numpy as np
 import pandas as pd
 from prepare_data import *
-import hook
 
 
 def tensor_pair_swap(x):
