@@ -1,6 +1,6 @@
 # DExter: Learning and Controlling Performance Expression with Diffusion Models
 
-[![arXiv Paper](https://img.shields.io/badge/arXiv-Paper-brightgreen)]() [![Colab Demo](https://img.shields.io/badge/Colab-Demo-orange)](https://colab.research.google.com/drive/1WAvdF3SOEIyy8qIQficFqfiRGOWBKd2C?usp=sharing)
+[![arXiv Paper](https://img.shields.io/badge/arXiv-Paper-brightgreen)](https://arxiv.org/abs/2406.14850) [![Colab Demo](https://img.shields.io/badge/Colab-Demo-orange)](https://colab.research.google.com/drive/1WAvdF3SOEIyy8qIQficFqfiRGOWBKd2C?usp=sharing)
 
 
 Code repository for DExter: a Diffusion-based Expressive performance generat(o)r, where we show samples of conditional and unconditioned rendering with perceptual-inspired features, as well as controlled ablation studies. The name also echos “dexterity”, one of the crucial qualities of human masters’ hands that enables the most fine-grained control over individual notes, which our models strive to achieve as well. 
