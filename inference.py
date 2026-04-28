@@ -1,8 +1,6 @@
-import os, sys, glob, argparse, yaml
+import os
 import warnings
 warnings.simplefilter("ignore")
-sys.path.insert(0, "../partitura")
-sys.path.insert(0, "../")
 import partitura as pt
 
 import hydra

@@ -1,8 +1,6 @@
-import os, sys, glob, copy
+import os, glob, copy
 import torch
 from collections import defaultdict
-sys.path.insert(0, "../partitura")
-sys.path.insert(0, "../")
 import partitura as pt
 import torch.nn.functional as F
 from scipy.interpolate import interp1d
@@ -50,7 +48,7 @@ TESTING_GROUP = [
     'VIENNA422_Schubert_D783_no15_seg0.',    
 ]
 
-def split_train_valid(codec_data, select_num=58008, paired_input=False):
+def split_train_valid(codec_data, select_num=58008, paired_input=False, data_root=None):
     """select the train and valid set according to the following criteria: 
         - ASAP and VIENNA422 goes to testing set as they are better ground truths
         - split regarding to pieces.(same score path)
@@ -97,20 +95,21 @@ def split_train_valid(codec_data, select_num=58008, paired_input=False):
     train_set = unselected_cd[:train_idx]
     valid_set = selected_cd
 
-    valid_set = np.array(valid_set)[list(map(lambda x: "mu" not in x['piece_name'], valid_set))]     
-    np.save(f"{BASE_DIR}/codec_N=200_mixup_train.npy", train_set)
-    np.save(f"{BASE_DIR}/codec_N=200_mixup_test.npy", valid_set)
+    valid_set = np.array(valid_set)[list(map(lambda x: "mu" not in x['piece_name'], valid_set))]
+    if data_root is not None:
+        np.save(f"{data_root}/codec_N=200_mixup_train.npy", train_set)
+        np.save(f"{data_root}/codec_N=200_mixup_test.npy", valid_set)
 
     return train_set, valid_set
 
-def load_transfer_pair(K=50000, N=200):
+def load_transfer_pair(data_root, K=50000, N=200):
     """
         returns:
         - transfer_pairs: list of tuple of codec
         - unpaired: list of single codec
     """
-    transfer_pairs = np.load(f"{BASE_DIR}/codec_N={N}_mixup_paired_K={K}.npy", allow_pickle=True)
-    unpaired = np.load(f"{BASE_DIR}/codec_N={N}_mixup_unpaired_K={K}.npy", allow_pickle=True)
+    transfer_pairs = np.load(f"{data_root}/codec_N={N}_mixup_paired_K={K}.npy", allow_pickle=True)
+    unpaired = np.load(f"{data_root}/codec_N={N}_mixup_unpaired_K={K}.npy", allow_pickle=True)
     return transfer_pairs, unpaired
 
 

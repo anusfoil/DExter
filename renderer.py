@@ -1,7 +1,5 @@
-import os, sys, glob, copy
+import os, glob, copy
 import torch
-sys.path.insert(0, "../partitura")
-sys.path.insert(0, "../")
 import partitura as pt
 import parangonar as pa
 import torch.nn.functional as F

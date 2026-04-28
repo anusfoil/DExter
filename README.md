@@ -29,7 +29,7 @@ To install all dependencies
 ```
 pip install -r requirements.txt
 ```
-Partitura versioning: This project use a slightly modified version of performance codec, and please install [my fork of partitura](https://github.com/anusfoil/partitura/tree/diffperformer_codec) where this branch is dedicated to this project. 
+Partitura versioning: This project uses a slightly modified version of the performance codec. The [partitura fork](https://github.com/anusfoil/partitura/tree/diffperformer_codec) is now pinned in `requirements.txt` via a git URL, so `pip install -r requirements.txt` will install it automatically.
 
 # Rendering on custom score
 
@@ -52,18 +52,25 @@ Three score-performance aligned datasets are used in this project:
 
 ## Precomputing codec
 
-The following script converts the scores and performances in the datasets into performance codec ```p_codec``` and score codec ```s_codec```. Output will be saved in ```data/```. Notice that different ```MAX_NOTE_SEQ``` will lead to different truncation of ```snote_ids``` and saved separately. 
+`prepare_data.py` converts aligned (score, performance) pairs into performance codec `p_codec`, score codec `s_codec`, and perceptual codec `c_codec`, packs them into a single HDF5 under `data_root/`, and writes per-segment `snote_ids` `.npy` files alongside.
+
+Path configuration (precedence: CLI > env > yaml):
+- `--data_root` / `$DEXTER_DATA_ROOT` — output dir, default `./data`
+- `--datasets_root` / `$DEXTER_DATASETS_ROOT` — parent of source corpora, default `../Datasets`
+- `config/paths.yaml` — declarative defaults; per-corpus subpaths live here
 
 ```
-python prepare_data.py --compute_codec --MAX_NOTE_SEQ=100 --mixup
+python prepare_data.py --compute_codec --MAX_NOTE_LEN=100 --mixup
 ```
-- ```MAX_NOTE_LEN```: The length of note sequence to split.
-- ```BASE_DIR```: base directory to save the output. The output would be saved as ```BASE_DIR/codec_N={max_note_len}.npy```
-- ```mixup```: whether mixup augmentation is used. Our mixup strategy takes every pair of interpretations and average the p_codec. This roughly scales the amount of data by 10 times. 
+- `--MAX_NOTE_LEN`: segment length in notes (each piece is sliced into windows of this size)
+- `--mixup`: enable mixup augmentation across same-score performances; averages every pair of interpretations to roughly 10× the data
+- `--datasets`: subset of `ATEPP ASAP VIENNA422` (default: all)
 
-For pre-computed codec, please [download](https://drive.google.com/file/d/1o91jYxOMsbXZZvfE7Z_8hM6DJbXixoXb/view?usp=sharing) and unzip. It contains the codec and snote_ids of ```MAX_NOTE_LEN=100, 300, 1000```. 
+Per-piece errors (missing files, low alignment-match ratios, codec extraction failures, length mismatches) are logged to `data_root/errors.jsonl`.
 
-Before training, put the pre-computed codec in ```data``` under the root folder. However, for testing and output decoded performance, you will need the originl score XML from the 3 datasets. Please download them and put them under ```Dataset``` in the same level as root folder (we need the score to decode performance). 
+For pre-computed codec at `MAX_NOTE_LEN=100, 300, 1000`, please [download](https://drive.google.com/file/d/1o91jYxOMsbXZZvfE7Z_8hM6DJbXixoXb/view?usp=sharing) and unzip into `data_root/`. (Re-uploaded to a fresh Drive folder; old QMUL c4dm-scratch link is dead — see Issue #1.)
+
+For decoding performances back to MIDI, you still need the original score XMLs from the three source datasets — point `--datasets_root` at wherever you've placed them.
 
 ![plot](doc/codec_visualization.png)
 
@@ -75,10 +82,10 @@ For transfer training or inference, we need to pair up two performances from the
 Note that mixuped interpolation data is of course not included in the pairing as they are not real performances, instead they go into the unpaired list.
 
 ```
-python prepare_data.py --pairing  --K=2374872
+python prepare_data.py --pairing --K=2374872
 ```
-- ```K```:  The number of pairs to generate. For the most 2374872 pairs can be found (segment level).  
-- ```BASE_DIR```: base directory to save the output. The output would be two numpy list saved as ```BASE_DIR/codec_N={N}_mixup_paired_K={K}.npy``` and ```BASE_DIR/codec_N={N}_mixup_unpaired_K={K}.npy``` 
+- `--K`: number of pairs to generate. Up to 2,374,872 segment-level pairs are available.
+- Pairs are written to `data_root/codec_N={N}_mixup_paired_K={K}.npy` and `data_root/codec_N={N}_mixup_unpaired_K={K}.npy`.
 
 
 

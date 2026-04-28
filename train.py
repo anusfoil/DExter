@@ -1,6 +1,4 @@
-import os, sys, random
-sys.path.insert(0, "../partitura")
-sys.path.insert(0, "../")
+import os, random
 import warnings
 warnings.filterwarnings('ignore')
 import numpy as np
@@ -29,17 +27,18 @@ def main(cfg):
     torch.cuda.manual_seed(cfg.random_seed)
 
     cfg.data_root = to_absolute_path(cfg.data_root)
-    if cfg.train_target == "transfer": # load only from paired set. 
+    if cfg.train_target == "transfer":  # load only from paired set.
         # TODO: modify after the new hdf5 loading
-        paired, _ = load_transfer_pair(K=2000000, N=cfg.seg_len) 
-        train_set, valid_set = split_train_valid(paired, select_num=0, paired_input=True)
+        paired, _ = load_transfer_pair(cfg.data_root, K=2000000, N=cfg.seg_len)
+        train_set, valid_set = split_train_valid(
+            paired, select_num=0, paired_input=True, data_root=cfg.data_root,
+        )
         assert(len(train_set) % 2 == 0)
-        assert(len(valid_set) % 2 == 0)   
+        assert(len(valid_set) % 2 == 0)
         cfg.dataloader.train.shuffle = False
 
-    else: 
-
-        hdf5_path = f"{BASE_DIR}/codec_N={cfg.seg_len}_mixup.hdf5"
+    else:
+        hdf5_path = f"{cfg.data_root}/codec_N={cfg.seg_len}_mixup.hdf5"
         train_set, valid_set = load_data_from_hdf5(hdf5_path)
 
     random.shuffle(train_set)

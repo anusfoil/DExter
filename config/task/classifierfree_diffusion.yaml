@@ -1,5 +1,8 @@
-dataset_means:  [0.7063542604446411, 0.4756112396717071, -0.011089393869042397, 0.6265323758125305, 0.24988953769207]
-dataset_stds: [2.0590381622314453, 0.15276259183883667, 0.6368748545646667, 1.2729265689849854, 0.15391376614570618]
+# dataset_means / dataset_stds are computed at runtime from the loaded train/valid sets
+# in train.py (see dataset_normalization). They are persisted with the checkpoint so that
+# inference can recover them without recomputing.
+dataset_means: null
+dataset_stds: null
 samples_root: 'artifacts/samples'
 lr: ${learning_rate}
 drop_c_con: ${drop_c_con}
