@@ -7,6 +7,16 @@ load_trained: False
 test_only: False
 pretrained_path: 'artifacts/checkpoint/targettransfer-lw11111-len200-beta0.2-steps1000-epsilon-TransferTrue-ssfrac0.75-L12-C512-cfdg_ddpm-w=1.2-p=0.1-k=3-dia=2-4/last-v2.ckpt'
 data_root: ./data
+
+# Optional: rewrite absolute paths embedded in the HDF5 at load time.
+# Use this when consuming an HDF5 produced on another machine (the score_path
+# and snote_id_path strings are absolute from regen — cross-host retrain needs
+# a runtime override rather than re-running prepare_data.py).
+# Example for Virginia consuming a codec generated on a local Mac:
+#   path_remap:
+#     "/Users/huanz/01Acdemics/PhD/Research/Datasets/": "/lambda/nfs/jliang-virginia/hworkspace/data/"
+#     "/Users/huanz/01Acdemics/PhD/Research/DExter_/data/snote_ids/": "/home/ubuntu/DExter/data/snote_ids/"
+path_remap: null
 seg_len: 200
 pin_memory: True
 random_seed: 13

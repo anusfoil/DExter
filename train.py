@@ -4,6 +4,7 @@ warnings.filterwarnings('ignore')
 import numpy as np
 import hydra
 from hydra.utils import to_absolute_path
+from omegaconf import OmegaConf
 import model as Model
 import torch
 torch.set_printoptions(sci_mode=False)
@@ -39,7 +40,12 @@ def main(cfg):
 
     else:
         hdf5_path = f"{cfg.data_root}/codec_N={cfg.seg_len}_mixup.hdf5"
-        train_set, valid_set = load_data_from_hdf5(hdf5_path)
+        # cfg.path_remap is an optional {old_prefix: new_prefix} dict for cross-host
+        # portability; the HDF5 embeds absolute paths from the regen machine, so
+        # consumers on a different host (e.g. Virginia retrain on a Drive-supplied
+        # codec) override paths here without rewriting the file.
+        path_remap = OmegaConf.to_container(cfg.path_remap) if cfg.get("path_remap") else None
+        train_set, valid_set = load_data_from_hdf5(hdf5_path, path_remap=path_remap)
 
     random.shuffle(train_set)
 

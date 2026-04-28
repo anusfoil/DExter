@@ -423,9 +423,34 @@ def _segment_piece(
 # HDF5 → in-memory loader (consumed by train.py)
 # ---------------------------------------------------------------------------
 
-def load_data_from_hdf5(hdf5_path):
+def _decode(x) -> str:
+    """h5py returns numpy bytes for string datasets; decode to plain str."""
+    return x.decode() if hasattr(x, "decode") else str(x)
+
+
+def _apply_path_remap(path: str, path_remap: Optional[dict]) -> str:
+    """Prefix-substitute a path, first match wins. Pass-through if no remap matches."""
+    if not path_remap:
+        return path
+    for old, new in path_remap.items():
+        if path.startswith(old):
+            return new + path[len(old):]
+    return path
+
+
+def load_data_from_hdf5(hdf5_path, path_remap: Optional[dict] = None):
+    """Load codec dicts from HDF5, optionally rewriting absolute paths.
+
+    ``path_remap`` is a dict of ``{old_prefix: new_prefix}``; both ``score_path``
+    and ``snote_id_path`` are rewritten when they start with one of the keys.
+    Use this to consume an HDF5 produced on a different machine — score paths
+    embedded by ``prepare_data.py`` are absolute, so cross-host portability needs
+    a runtime override.
+    """
     train_data, test_data = [], []
     logger.info("Loading data from %s", hdf5_path)
+    if path_remap:
+        logger.info("path_remap: %s", dict(path_remap))
 
     with h5py.File(hdf5_path, "r") as hdf5_file:
         for group_name in tqdm(hdf5_file):
@@ -445,10 +470,10 @@ def load_data_from_hdf5(hdf5_path):
                 "p_codec": p_codec[i],
                 "s_codec": s_codec[i],
                 "c_codec": c_codec[i],
-                "snote_id_path": snote_id_path[i],
-                "score_path": score_path[i],
-                "piece_name": piece_name[i].decode(),
-                "split": split[i].decode(),
+                "snote_id_path": _apply_path_remap(_decode(snote_id_path[i]), path_remap),
+                "score_path": _apply_path_remap(_decode(score_path[i]), path_remap),
+                "piece_name": _decode(piece_name[i]),
+                "split": _decode(split[i]),
             } for i in range(len(p_codec))]
 
             if piece_data[0]["split"] == "train":
