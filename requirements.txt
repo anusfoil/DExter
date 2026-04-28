@@ -14,6 +14,10 @@ scipy>=1.10,<1.15
 seaborn>=0.12
 # partitura still imports pkg_resources, which setuptools dropped in 81+
 setuptools<81
-torch>=1.13,<2.5
+torch>=1.13,<2.6
+torchaudio>=0.13
+# parangonar is needed by renderer.py; install separately with --no-deps because
+# its newer versions force partitura>=1.6 and clash with the fork above:
+#   pip install --no-deps parangonar
 tqdm>=4.64
 wandb>=0.15
