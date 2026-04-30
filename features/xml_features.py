@@ -235,9 +235,27 @@ def _vocab_get(vocab: dict[str, int], key: str, default_key: str = "<other>") ->
     return int(v)
 
 
+class PieceFeatureCache:
+    """Cache the expensive per-piece data structures so repeated segment
+    extraction on the same piece is cheap.
+
+    Build once per (score, unfolded-or-not) combination, query per segment.
+    """
+
+    __slots__ = ("part", "note_by_id", "constant_loud", "inc_loud", "dec_loud", "tempo_spans", "pedal_spans")
+
+    def __init__(self, score: "ps.Score | ps.Part"):
+        self.part = score.parts[0] if isinstance(score, ps.Score) else score
+        self.note_by_id = {n.id: n for n in self.part.iter_all(ps.Note)}
+        self.constant_loud, self.inc_loud, self.dec_loud = _collect_loudness_spans(self.part)
+        self.tempo_spans = _collect_tempo_spans(self.part)
+        self.pedal_spans = _collect_pedal_spans(self.part)
+
+
 def extract_xml_features(
     score: ps.Score | ps.Part,
     note_array: np.ndarray | None = None,
+    cache: PieceFeatureCache | None = None,
 ) -> dict[str, np.ndarray]:
     """Extract structured XML features aligned with ``note_array``'s rows.
 
@@ -246,20 +264,19 @@ def extract_xml_features(
         note_array: pre-computed note_array. If None, computed from the score
             with all include_* flags on. Order must match the iteration order
             of ``part.iter_all(Note)``.
+        cache: pre-built ``PieceFeatureCache`` for this score. Pass it in
+            when calling repeatedly on segments of the same piece — saves the
+            full-part traversal that builds ``note_by_id`` and the
+            direction-span lists. If None, a fresh cache is built per call
+            (the v0 behaviour).
 
     Returns:
         Dict of features. Each value is an ``np.ndarray`` of length N (number
         of notes), with dtype int (categorical IDs) or float (continuous).
-        Keys:
-
-        * ``articulation_id``, ``ornament_id``, ``slur_state_id``,
-          ``tie_state_id``, ``has_fermata``, ``is_grace``, ``in_tuplet``
-        * ``active_loudness_id``, ``in_cresc``, ``cresc_progress``,
-          ``in_dim``, ``dim_progress``
-        * ``active_tempo_kind_id`` (constant / inc / dec / reset / none)
-        * ``pedal_down`` (0/1)
     """
-    part = score.parts[0] if isinstance(score, ps.Score) else score
+    if cache is None:
+        cache = PieceFeatureCache(score)
+    part = cache.part
 
     if note_array is None:
         note_array = part.note_array(
@@ -272,11 +289,12 @@ def extract_xml_features(
             include_divs_per_quarter=True,
         )
 
-    note_by_id = {n.id: n for n in part.iter_all(ps.Note)}
-
-    constant_loud, inc_loud, dec_loud = _collect_loudness_spans(part)
-    tempo_spans = _collect_tempo_spans(part)
-    pedal_spans = _collect_pedal_spans(part)
+    note_by_id = cache.note_by_id
+    constant_loud = cache.constant_loud
+    inc_loud = cache.inc_loud
+    dec_loud = cache.dec_loud
+    tempo_spans = cache.tempo_spans
+    pedal_spans = cache.pedal_spans
 
     N = len(note_array)
     feats: dict[str, np.ndarray] = {

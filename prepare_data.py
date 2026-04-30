@@ -438,7 +438,11 @@ def _apply_path_remap(path: str, path_remap: Optional[dict]) -> str:
     return path
 
 
-def load_data_from_hdf5(hdf5_path, path_remap: Optional[dict] = None):
+def load_data_from_hdf5(
+    hdf5_path,
+    path_remap: Optional[dict] = None,
+    include_xml_features: bool = False,
+):
     """Load codec dicts from HDF5, optionally rewriting absolute paths.
 
     ``path_remap`` is a dict of ``{old_prefix: new_prefix}``; both ``score_path``
@@ -446,20 +450,36 @@ def load_data_from_hdf5(hdf5_path, path_remap: Optional[dict] = None):
     Use this to consume an HDF5 produced on a different machine — score paths
     embedded by ``prepare_data.py`` are absolute, so cross-host portability needs
     a runtime override.
+
+    If ``include_xml_features=True`` and groups carry a ``xml_features``
+    dataset (added by ``features/augment_hdf5.py``), those columns are
+    concatenated to ``s_codec`` so the consumer sees a wider score-codec
+    array. Pieces missing the dataset are silently skipped — keeps the loader
+    usable on partially-augmented hdf5 during incremental rollout.
     """
     train_data, test_data = [], []
     logger.info("Loading data from %s", hdf5_path)
     if path_remap:
         logger.info("path_remap: %s", dict(path_remap))
+    if include_xml_features:
+        logger.info("Loading xml_features columns alongside s_codec")
 
+    skipped_no_xml = 0
     with h5py.File(hdf5_path, "r") as hdf5_file:
         for group_name in tqdm(hdf5_file):
             group = hdf5_file[group_name]
             if "error" in group:
                 continue
+            if include_xml_features and "xml_features" not in group:
+                skipped_no_xml += 1
+                continue
 
             p_codec = np.array(group["p_codec"])
             s_codec = np.array(group["s_codec"])
+            if include_xml_features:
+                xml_features = np.array(group["xml_features"]).astype(s_codec.dtype)
+                # s_codec: (N_seg, T, F_s) — concat xml_features (N_seg, T, F_xml) on F axis
+                s_codec = np.concatenate([s_codec, xml_features], axis=-1)
             c_codec = np.array(group["c_codec"])
             snote_id_path = np.array(group["snote_id_path"])
             score_path = np.array(group["score_path"])
@@ -481,6 +501,11 @@ def load_data_from_hdf5(hdf5_path, path_remap: Optional[dict] = None):
             else:
                 test_data.extend(pd_ for pd_ in piece_data if "mixup" not in pd_["piece_name"])
 
+    if include_xml_features and skipped_no_xml:
+        logger.warning(
+            "skipped %d groups missing xml_features — re-run features/augment_hdf5.py to fill",
+            skipped_no_xml,
+        )
     return train_data, test_data
 
 
