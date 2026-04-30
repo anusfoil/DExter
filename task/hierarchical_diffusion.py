@@ -110,14 +110,15 @@ class HierarchicalCodecDiffusion(CodecDiffusion):
         """(B, K, F_p) → (B, T, F_p)."""
         return self.p_target_transform.inverse(p_coef_bkf)
 
-    def _transform_s_codec(self, s_codec_bft: torch.Tensor) -> torch.Tensor:
-        """(B, F_s, T) → (B, F_s, K), or pass-through if disabled."""
+    def _transform_s_codec(self, s_codec_btF: torch.Tensor) -> torch.Tensor:
+        """(B, T, F_s) → (B, K, F_s), or pass-through if disabled.
+
+        DataLoader convention is channel-last (B, T, F); transforms operate on
+        the time axis directly so no transpose dance is needed.
+        """
         if self.s_target_transform is None:
-            return s_codec_bft
-        # transform expects (B, T, F); we have (B, F, T)
-        s_btF = s_codec_bft.transpose(1, 2).float()
-        s_bKF = self.s_target_transform.transform(s_btF)
-        return s_bKF.transpose(1, 2)
+            return s_codec_btF
+        return self.s_target_transform.transform(s_codec_btF.float())
 
     # --------------------------------------------------------------- training
 
@@ -134,16 +135,10 @@ class HierarchicalCodecDiffusion(CodecDiffusion):
         p_coef = self._transform_p_codec(p_codec)               # (B, K, F_p)
         p_coef = p_coef.unsqueeze(1)                            # (B, 1, K, F_p)
 
-        s_codec_coef = self._transform_s_codec(s_codec)         # (B, F_s, K)
+        s_codec_coef = self._transform_s_codec(s_codec)         # (B, K, F_s)
         # c_codec is unused (dropped in v2); transform anyway for shape parity
         if self.s_target_transform is not None:
-            c_codec = c_codec.float()
-            c_codec_coef = (
-                self.s_target_transform
-                .transform(c_codec.transpose(1, 2).float())
-                .transpose(1, 2)
-                if c_codec.shape[-1] == self.hparams.seg_len else c_codec
-            )
+            c_codec_coef = self.s_target_transform.transform(c_codec.float())
         else:
             c_codec_coef = c_codec
 
@@ -222,14 +217,10 @@ class HierarchicalCodecDiffusion(CodecDiffusion):
         if c_codec is None:
             c_codec = batch["c_codec"]
 
-        # transform conditioning to coef space (same hack as in step())
+        # transform conditioning to coef space (channel-last convention)
         s_codec_coef = self._transform_s_codec(s_codec)
-        if self.s_target_transform is not None and c_codec.shape[-1] == self.hparams.seg_len:
-            c_codec_coef = (
-                self.s_target_transform
-                .transform(c_codec.float().transpose(1, 2))
-                .transpose(1, 2)
-            )
+        if self.s_target_transform is not None:
+            c_codec_coef = self.s_target_transform.transform(c_codec.float())
         else:
             c_codec_coef = c_codec
 

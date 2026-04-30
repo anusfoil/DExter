@@ -166,26 +166,34 @@ class ScorePositionalEncoder(nn.Module):
     def forward(self, s_codec: torch.Tensor) -> torch.Tensor:
         """
         Args:
-            s_codec: (B, F, N) — F=4 in v1. Channel 0 is onset_div, channel 3 is voice id.
+            s_codec: (B, N, F) — channel-last (matches DataLoader convention).
+                     Channel 0 is onset_div, channel 3 is voice id; remaining channels
+                     are projected linearly into d_model.
         Returns:
             (B, N, d_model) positional embedding to add to token embeddings.
         """
-        B, F_, N = s_codec.shape
-        s = s_codec.transpose(1, 2)                                # (B, N, F)
-        onset_div = s[..., 0]                                      # (B, N)
+        B, N, F_ = s_codec.shape
+        onset_div = s_codec[..., 0]                                # (B, N)
         # rough normalization — onset_div can be huge; scale to keep sinusoid args bounded
         onset_norm = onset_div * self.onset_scale
         pos_sin = _sinusoidal_pos_emb(onset_norm, self.d_model)    # (B, N, d_model)
 
-        voice = s[..., 3].long().clamp(0, self.max_voice - 1)
+        voice = s_codec[..., 3].long().clamp(0, self.max_voice - 1)
         v_emb = self.voice_embed(voice)                            # (B, N, d_model)
 
         # continuous projection of remaining channels (duration, pitch, ...)
         # exclude onset (channel 0) and voice (channel 3), keep the rest
-        cont = torch.cat([s[..., 1:3], s[..., 4:]], dim=-1) if F_ > 4 else s[..., 1:3]
-        # If F_ < self.s_codec_rows the linear has more inputs than data — pad zeros.
+        cont = (
+            torch.cat([s_codec[..., 1:3], s_codec[..., 4:]], dim=-1)
+            if F_ > 4 else s_codec[..., 1:3]
+        )
+        # If cont has fewer columns than cont_proj.in_features, right-pad with zeros.
         if cont.shape[-1] < self.cont_proj.in_features:
-            pad = torch.zeros(*cont.shape[:-1], self.cont_proj.in_features - cont.shape[-1], device=cont.device, dtype=cont.dtype)
+            pad = torch.zeros(
+                *cont.shape[:-1],
+                self.cont_proj.in_features - cont.shape[-1],
+                device=cont.device, dtype=cont.dtype,
+            )
             cont = torch.cat([cont, pad], dim=-1)
         cont_emb = self.cont_proj(cont.float())
 
