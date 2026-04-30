@@ -477,9 +477,14 @@ def load_data_from_hdf5(
             p_codec = np.array(group["p_codec"])
             s_codec = np.array(group["s_codec"])
             if include_xml_features:
-                xml_features = np.array(group["xml_features"]).astype(s_codec.dtype)
-                # s_codec: (N_seg, T, F_s) — concat xml_features (N_seg, T, F_xml) on F axis
-                s_codec = np.concatenate([s_codec, xml_features], axis=-1)
+                # xml_features carries continuous columns (cresc_progress, dim_progress)
+                # that would be truncated to 0 if cast to s_codec's int dtype.
+                # Promote both to float32 for the concat.
+                xml_features = np.array(group["xml_features"], dtype=np.float32)
+                s_codec = np.concatenate(
+                    [s_codec.astype(np.float32, copy=False), xml_features],
+                    axis=-1,
+                )
             c_codec = np.array(group["c_codec"])
             snote_id_path = np.array(group["snote_id_path"])
             score_path = np.array(group["score_path"])
