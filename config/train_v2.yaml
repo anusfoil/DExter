@@ -1,0 +1,74 @@
+# Training config for DExter v2 — hierarchical-target diffusion with a
+# DiT-style transformer denoiser.
+#
+# Use::
+#
+#     python train.py --config-name=train_v2
+#
+# Different from train.yaml in three places: the model is V2Model (composes
+# HierarchicalCodecDiffusion with TransformerDenoiser), the target_transform
+# defaults to dct/keep=32, and conditioning latent is dropped (drop_c_con=True).
+
+gpus: [0]
+val_freq: 10
+learning_rate: 5e-5
+epochs: 200
+download: False
+load_trained: False
+test_only: False
+pretrained_path: 'artifacts/checkpoint/last.ckpt'
+data_root: ./data
+
+# Optional: rewrite absolute paths embedded in the HDF5 at load time. Same
+# semantics as train.yaml; left null for local-mac runs.
+path_remap: null
+
+seg_len: 200
+pin_memory: True
+random_seed: 13
+condition_eval: False
+drop_c_con: True               # v2 drops the conditioning latent
+
+train_target: 'gen_noise'      # 'transfer' is also supported via the parent task
+
+test:
+  sample_steps_frac: 1
+  transfer: False
+
+dataloader:
+  smoothed: False
+  mixup: True
+  train:
+    batch_size: 256
+    num_workers: 40
+    shuffle: True
+    pin_memory: ${pin_memory}
+    prefetch_factor: 2
+    persistent_workers: True
+  val:
+    batch_size: 16
+    num_workers: 4
+    shuffle: True
+    pin_memory: ${pin_memory}
+
+trainer:
+  gpus: ${gpus}
+  max_epochs: ${epochs}
+  check_val_every_n_epoch: ${val_freq}
+
+modelcheckpoint:
+  monitor: 'Val/tempo_vel_loss'
+  filename: '{epoch:02d}e-tv_loss{Train/tv_loss:.2f}'
+  save_top_k: 1
+  save_last: True
+  mode: "min"
+  auto_insert_metric_name: False
+
+defaults:
+  - model: V2Model
+  - task: classifierfree_diffusion
+
+hydra:
+  output_subdir: null
+  run:
+    dir: .

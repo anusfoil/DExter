@@ -1,0 +1,35 @@
+model:
+  name: 'V2Model'
+  args:
+    # ---- p/s/c codec layout (must match prepare_data + dataset)
+    p_codec_rows: 5
+    s_codec_rows: 4         # bump once xml_features is wired into prepare_data
+    c_codec_rows: 7         # accepted-and-ignored by v2; kept for shape parity
+    seg_len: ${seg_len}
+
+    # ---- transformer hparams
+    d_model: 384
+    n_heads: 6
+    n_layers: 12
+    mlp_ratio: 4.0
+    dropout: 0.0
+    cond_dropout: 0.1
+
+    # ---- hierarchical target (the multi-scale piece)
+    target_transform: 'dct'         # 'identity' | 'dct' | 'wavelet'
+    target_keep_low_k: 32           # K — bandwidth for the low-pass smoothness prior
+    transform_score_codec: True     # also DCT s_codec channel-wise to match coef length
+
+    # ---- legacy hparams (accepted-and-ignored by TransformerDenoiser; kept
+    #      for compatibility with the existing classifierfree_diffusion task config)
+    residual_channels: 384
+    unconditional: False
+    condition: 'fixed'
+    residual_layers: 12
+    kernel_size: 3
+    dilation_base: 2
+    dilation_bound: 4
+    norm_args:
+      - 0
+      - 1
+      - 'rowwise'
