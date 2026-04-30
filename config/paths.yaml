@@ -1,0 +1,24 @@
+# Path configuration for DExter.
+#
+# Override at runtime via:
+#   - environment variables: DEXTER_DATA_ROOT, DEXTER_DATASETS_ROOT
+#   - CLI flags:              --data_root, --datasets_root
+#
+# `data_root` is where pre-computed codecs (HDF5) and snote_id arrays are written.
+# `datasets_root` is the parent of the source corpora (ATEPP-1.1, asap-dataset-alignment,
+# vienna4x22). Each corpus's relative layout is fixed by the public dataset structure.
+
+data_root: ./data
+datasets_root: ../Datasets
+
+datasets:
+  ATEPP:
+    root: ATEPP-1.1
+    metadata: ATEPP-1.1/ATEPP-metadata-1.3.csv
+  ASAP:
+    root: asap-dataset-alignment
+  VIENNA422:
+    root: vienna4x22
+    match_dir: vienna4x22/match
+    musicxml_dir: vienna4x22/musicxml
+    cep_dir: vienna4x22/cep_features

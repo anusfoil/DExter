@@ -1,11 +1,10 @@
-import os, sys, random
-sys.path.insert(0, "../partitura")
-sys.path.insert(0, "../")
+import os, random
 import warnings
 warnings.filterwarnings('ignore')
 import numpy as np
 import hydra
 from hydra.utils import to_absolute_path
+from omegaconf import OmegaConf
 import model as Model
 import torch
 torch.set_printoptions(sci_mode=False)
@@ -29,18 +28,24 @@ def main(cfg):
     torch.cuda.manual_seed(cfg.random_seed)
 
     cfg.data_root = to_absolute_path(cfg.data_root)
-    if cfg.train_target == "transfer": # load only from paired set. 
+    if cfg.train_target == "transfer":  # load only from paired set.
         # TODO: modify after the new hdf5 loading
-        paired, _ = load_transfer_pair(K=2000000, N=cfg.seg_len) 
-        train_set, valid_set = split_train_valid(paired, select_num=0, paired_input=True)
+        paired, _ = load_transfer_pair(cfg.data_root, K=2000000, N=cfg.seg_len)
+        train_set, valid_set = split_train_valid(
+            paired, select_num=0, paired_input=True, data_root=cfg.data_root,
+        )
         assert(len(train_set) % 2 == 0)
-        assert(len(valid_set) % 2 == 0)   
+        assert(len(valid_set) % 2 == 0)
         cfg.dataloader.train.shuffle = False
 
-    else: 
-
-        hdf5_path = f"{BASE_DIR}/codec_N={cfg.seg_len}_mixup.hdf5"
-        train_set, valid_set = load_data_from_hdf5(hdf5_path)
+    else:
+        hdf5_path = f"{cfg.data_root}/codec_N={cfg.seg_len}_mixup.hdf5"
+        # cfg.path_remap is an optional {old_prefix: new_prefix} dict for cross-host
+        # portability; the HDF5 embeds absolute paths from the regen machine, so
+        # consumers on a different host (e.g. Virginia retrain on a Drive-supplied
+        # codec) override paths here without rewriting the file.
+        path_remap = OmegaConf.to_container(cfg.path_remap) if cfg.get("path_remap") else None
+        train_set, valid_set = load_data_from_hdf5(hdf5_path, path_remap=path_remap)
 
     random.shuffle(train_set)
 

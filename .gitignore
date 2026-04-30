@@ -1,0 +1,33 @@
+# bytecode / OS
+__pycache__/
+*.pyc
+.DS_Store
+.ipynb_checkpoints/
+
+# data and model artifacts (regenerated)
+data/
+artifacts/
+weights/
+outputs/
+inference_out/
+**/wandb/
+
+# logs and scratch
+*.log
+*.gif
+tmp*
+errors.jsonl
+
+# numpy caches (only ignore inside data/ — example.npy in repo is committed)
+data/**/*.npy
+**/snote_ids/**
+
+# legacy / dev-only
+oracle/
+testing_pieces/
+maestro-v2.0.0/
+DiffPerformer/
+sweep.yaml
+visualization.ipynb
+model/diffwave_hyon.py
+hook.py

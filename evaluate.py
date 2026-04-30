@@ -1,10 +1,9 @@
-import os, sys, random
+import os, glob, random
 from collections import defaultdict
 import warnings
 warnings.filterwarnings("ignore")
-sys.path.insert(0, "../partitura")
-sys.path.insert(0, "../")
 from tqdm import tqdm
+import pandas as pd
 import numpy as np
 import hydra
 from hydra.utils import to_absolute_path
@@ -140,8 +139,6 @@ def eval_renderer(cfg, val_loader):
             renderer.save_pf_distribution(gt_space=f"artifacts/samples/GT/{snote_id_dir}")
             # except Exception as e:
             #     print(e)  
-        hook()          
-        
 
 
 def save_all_gt(cfg, valid_set, indices_dict):
@@ -195,10 +192,13 @@ def main(cfg):
     #                                          select_num=3000,
     #                                          paired_input=True
     #                                          )
-    train_set = np.load(f"{BASE_DIR}/codec_N={cfg.seg_len}_mixup_train.npy", allow_pickle=True)
-    valid_set = np.load(f"{BASE_DIR}/codec_N={cfg.seg_len}_mixup_test_shuffled.npy", allow_pickle=True)
+    train_set = np.load(f"{cfg.data_root}/codec_N={cfg.seg_len}_mixup_train.npy", allow_pickle=True)
+    valid_set = np.load(f"{cfg.data_root}/codec_N={cfg.seg_len}_mixup_test_shuffled.npy", allow_pickle=True)
     if cfg.test.transfer:
-        _, valid_set = split_train_valid(np.load(f"{BASE_DIR}/codec_N={cfg.seg_len}_mixup_paired_K=2000000.npy", allow_pickle=True), paired_input=True)
+        _, valid_set = split_train_valid(
+            np.load(f"{cfg.data_root}/codec_N={cfg.seg_len}_mixup_paired_K=2000000.npy", allow_pickle=True),
+            paired_input=True, data_root=cfg.data_root,
+        )
 
     # indices_dict = group_same_seg(valid_set)
     # save_all_gt(cfg, valid_set, indices_dict)
