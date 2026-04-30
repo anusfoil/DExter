@@ -45,7 +45,15 @@ def main(cfg):
         # consumers on a different host (e.g. Virginia retrain on a Drive-supplied
         # codec) override paths here without rewriting the file.
         path_remap = OmegaConf.to_container(cfg.path_remap) if cfg.get("path_remap") else None
-        train_set, valid_set = load_data_from_hdf5(hdf5_path, path_remap=path_remap)
+        # cfg.include_xml_features=True concatenates the 14-D xml_features columns
+        # onto s_codec at load time. Requires the HDF5 to be augmented via
+        # `python -m features.augment_hdf5 --hdf5 ...`.
+        include_xml_features = bool(cfg.get("include_xml_features", False))
+        train_set, valid_set = load_data_from_hdf5(
+            hdf5_path,
+            path_remap=path_remap,
+            include_xml_features=include_xml_features,
+        )
 
     random.shuffle(train_set)
 

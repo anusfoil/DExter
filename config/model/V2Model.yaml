@@ -3,7 +3,12 @@ model:
   args:
     # ---- p/s/c codec layout (must match prepare_data + dataset)
     p_codec_rows: 5
-    s_codec_rows: 4         # bump once xml_features is wired into prepare_data
+    # 4 base columns (onset_div, duration_div, pitch, voice) + 14 xml_features
+    # (articulation_id, ornament_id, slur_state_id, tie_state_id, has_fermata,
+    # is_grace, in_tuplet, active_loudness_id, in_cresc, cresc_progress, in_dim,
+    # dim_progress, active_tempo_kind_id, pedal_down) when include_xml_features=True.
+    # Drop to 4 if running without the augmented HDF5.
+    s_codec_rows: 18
     c_codec_rows: 7         # accepted-and-ignored by v2; kept for shape parity
     seg_len: ${seg_len}
 

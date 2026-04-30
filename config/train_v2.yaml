@@ -23,6 +23,11 @@ data_root: ./data
 # semantics as train.yaml; left null for local-mac runs.
 path_remap: null
 
+# v2 reads xml_features columns from the HDF5 (added by features/augment_hdf5.py)
+# and concatenates them onto s_codec. Set to False to fall back to the original
+# 4-D s_codec — also bump V2Model.s_codec_rows: 18 → 4 in that case.
+include_xml_features: True
+
 seg_len: 200
 pin_memory: True
 random_seed: 13
