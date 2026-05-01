@@ -4,6 +4,11 @@ __pycache__/
 .DS_Store
 .ipynb_checkpoints/
 
+# virtual envs
+.venv/
+venv/
+env/
+
 # data and model artifacts (regenerated)
 data/
 artifacts/

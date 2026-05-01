@@ -49,10 +49,18 @@ def main(cfg):
         # onto s_codec at load time. Requires the HDF5 to be augmented via
         # `python -m features.augment_hdf5 --hdf5 ...`.
         include_xml_features = bool(cfg.get("include_xml_features", False))
+        # cfg.dataset_filter (e.g. ['ASAP']) restricts training to a subset of
+        # the corpora — useful when a corpus has cleaner alignment labels than
+        # the others.
+        dataset_filter = (
+            list(OmegaConf.to_container(cfg.dataset_filter))
+            if cfg.get("dataset_filter") else None
+        )
         train_set, valid_set = load_data_from_hdf5(
             hdf5_path,
             path_remap=path_remap,
             include_xml_features=include_xml_features,
+            dataset_filter=dataset_filter,
         )
 
     random.shuffle(train_set)

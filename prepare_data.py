@@ -442,6 +442,7 @@ def load_data_from_hdf5(
     hdf5_path,
     path_remap: Optional[dict] = None,
     include_xml_features: bool = False,
+    dataset_filter: Optional[list] = None,
 ):
     """Load codec dicts from HDF5, optionally rewriting absolute paths.
 
@@ -456,6 +457,12 @@ def load_data_from_hdf5(
     concatenated to ``s_codec`` so the consumer sees a wider score-codec
     array. Pieces missing the dataset are silently skipped — keeps the loader
     usable on partially-augmented hdf5 during incremental rollout.
+
+    ``dataset_filter`` (e.g. ``['ASAP']``) keeps only groups whose name starts
+    with one of the listed prefixes. Use this to train on a single dataset
+    (typically ASAP, which has the cleanest alignment labels — VirtuosoNet
+    showed onset-deviation σ went 7.369 → 0.053 quarter-notes after refining
+    alignment, so label noise is a real ceiling on this task).
     """
     train_data, test_data = [], []
     logger.info("Loading data from %s", hdf5_path)
@@ -463,12 +470,18 @@ def load_data_from_hdf5(
         logger.info("path_remap: %s", dict(path_remap))
     if include_xml_features:
         logger.info("Loading xml_features columns alongside s_codec")
+    if dataset_filter:
+        logger.info("dataset_filter: keeping only %s groups", list(dataset_filter))
 
     skipped_no_xml = 0
+    skipped_filtered = 0
     with h5py.File(hdf5_path, "r") as hdf5_file:
         for group_name in tqdm(hdf5_file):
             group = hdf5_file[group_name]
             if "error" in group:
+                continue
+            if dataset_filter and not any(group_name.startswith(d + "_") for d in dataset_filter):
+                skipped_filtered += 1
                 continue
             if include_xml_features and "xml_features" not in group:
                 skipped_no_xml += 1
@@ -511,6 +524,8 @@ def load_data_from_hdf5(
             "skipped %d groups missing xml_features — re-run features/augment_hdf5.py to fill",
             skipped_no_xml,
         )
+    if dataset_filter and skipped_filtered:
+        logger.info("skipped %d groups outside %s", skipped_filtered, list(dataset_filter))
     return train_data, test_data
 
 

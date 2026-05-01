@@ -22,7 +22,10 @@ model:
 
     # ---- hierarchical target (the multi-scale piece)
     target_transform: 'dct'         # 'identity' | 'dct' | 'wavelet'
-    target_keep_low_k: 32           # K — bandwidth for the low-pass smoothness prior
+    target_keep_low_k: 64           # K — bandwidth for the low-pass smoothness prior.
+                                    # K=32 (16% of seg_len=200) was over-smoothing
+                                    # in the May 1 run; K=64 (32%) leaves more
+                                    # room for note-level expressive variation.
     transform_score_codec: True     # also DCT s_codec channel-wise to match coef length
 
     # ---- legacy hparams (accepted-and-ignored by TransformerDenoiser; kept

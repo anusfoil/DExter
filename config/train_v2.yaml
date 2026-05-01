@@ -28,6 +28,10 @@ path_remap: null
 # 4-D s_codec — also bump V2Model.s_codec_rows: 18 → 4 in that case.
 include_xml_features: True
 
+# Optional list of dataset prefixes to include (e.g. ['ASAP']). null = all.
+# ASAP has the cleanest alignment labels among the three corpora.
+dataset_filter: null
+
 seg_len: 200
 pin_memory: True
 random_seed: 13
