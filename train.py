@@ -99,8 +99,11 @@ def main(cfg):
                 f"p={cfg.model.model.args.cond_dropout}-k={cfg.model.model.args.kernel_size}-" + \
                 f"dia={cfg.model.model.args.dilation_base}-{cfg.model.model.args.dilation_bound}"
 
+    # When run_tag is set (ablation sweep), use a short readable name instead
+    # of the auto-derived hyperparam-encoded string. Long names are unreadable
+    # in wandb side-by-side comparisons.
     if cfg.get("run_tag"):
-        name = f"{name}-{cfg.run_tag}"
+        name = f"v2-{cfg.run_tag}"
 
     if cfg.test_only:
         name = "TEST-" + name

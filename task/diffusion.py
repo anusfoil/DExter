@@ -340,13 +340,15 @@ class CodecDiffusion(pl.LightningModule):
                                         repeat_delay=1000)
             ani.save(f'{save_root}/animation.gif', dpi=80, writer='imagemagick')
 
-        # plot the comparison between prediction and label 
+        # plot the comparison between prediction and label
         fig, ax = plt.subplots(2 * N, 1, figsize=(24, 4 * N))
         for idx, (pred, label) in enumerate(zip(pcodec_pred, batch_label_codec)):
             plot_codec(pred, label, ax[idx*2], ax[idx*2+1], fig)
         self.logger.log_image(key=f"Val/pred_label", images=[fig])
         plt.savefig(f"{save_root}/pred_label.png")
-
+        plt.close(fig)
+        plt.close(tc_fig)
+        plt.close('all')
 
         sampled_loss = self.p_losses(batch_label_codec, torch.tensor(pcodec_pred), loss_type='l2')
 
