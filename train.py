@@ -73,8 +73,10 @@ def main(cfg):
     train_loader = DataLoader(train_set, **cfg.dataloader.train)
     val_loader = DataLoader(valid_set, **cfg.dataloader.val) 
 
-    # set the fraction so that around 20 batchs are output for listen.
-    cfg.task.valid_fraction = 20 / len(val_loader)      
+    # control how many val batches get the full 1000-step diffusion sample +
+    # MIDI render (the expensive operation). Default 20; reduce for cheap vals.
+    n_val_sample_batches = cfg.get("valid_n_batches") or 20
+    cfg.task.valid_fraction = n_val_sample_batches / len(val_loader)
 
     # Model
     if cfg.load_trained:
