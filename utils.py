@@ -17,9 +17,23 @@ from prepare_data import *
 def tensor_pair_swap(x):
     if type(x) == list:
         x = np.array(x)
-    # given batched x, swap the pairs from the first dimension
-    permute_index = torch.arange(x.shape[0]).view(-1, 2)[:, [1, 0]].contiguous().view(-1)
-    return x[permute_index]
+    # given batched x, swap the pairs from the first dimension.
+    # Tail batches under DDP can be odd-sized (or even size 1); swapping
+    # only what fits in pairs and leaving the singleton untouched avoids
+    # the "shape '[-1, 2]' invalid for input of size 1" RuntimeError that
+    # crashes the final val cycle.
+    n = x.shape[0]
+    if n < 2:
+        return x
+    n_pair = (n // 2) * 2
+    permute_index = torch.arange(n_pair).view(-1, 2)[:, [1, 0]].contiguous().view(-1)
+    if n_pair == n:
+        return x[permute_index]
+    head = x[:n_pair][permute_index]
+    tail = x[n_pair:]
+    if isinstance(x, torch.Tensor):
+        return torch.cat([head, tail], dim=0)
+    return np.concatenate([head, tail], axis=0)
 
 
 def get_batch_slice(batch, idx):
