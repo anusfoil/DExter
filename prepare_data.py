@@ -443,6 +443,8 @@ def load_data_from_hdf5(
     path_remap: Optional[dict] = None,
     include_xml_features: bool = False,
     dataset_filter: Optional[list] = None,
+    atepp_min_match_ratio: Optional[float] = None,
+    atepp_quality_csv: Optional[str] = None,
 ):
     """Load codec dicts from HDF5, optionally rewriting absolute paths.
 
@@ -463,6 +465,13 @@ def load_data_from_hdf5(
     (typically ASAP, which has the cleanest alignment labels — VirtuosoNet
     showed onset-deviation σ went 7.369 → 0.053 quarter-notes after refining
     alignment, so label noise is a real ceiling on this task).
+
+    ``atepp_min_match_ratio`` (0.0 - 1.0): if set, drop ATEPP groups whose
+    parangonar match-ratio is below this threshold. Reads
+    ``atepp_quality_csv`` (default ``data/atepp_match_ratios.csv``) which is
+    produced by ``python -m features.atepp_quality``. ASAP and VIENNA422 are
+    untouched. Pieces missing from the CSV are kept (with a warning), so the
+    filter degrades gracefully if the CSV is stale.
     """
     train_data, test_data = [], []
     logger.info("Loading data from %s", hdf5_path)
@@ -473,8 +482,30 @@ def load_data_from_hdf5(
     if dataset_filter:
         logger.info("dataset_filter: keeping only %s groups", list(dataset_filter))
 
+    atepp_quality = None
+    if atepp_min_match_ratio is not None:
+        csv_path = Path(atepp_quality_csv or
+                        Path(hdf5_path).parent / "atepp_match_ratios.csv")
+        if csv_path.exists():
+            qdf = pd.read_csv(csv_path).set_index("piece_name")
+            atepp_quality = qdf["match_ratio"].to_dict()
+            n_pass = sum(1 for v in atepp_quality.values()
+                         if v is not None and v == v and v >= atepp_min_match_ratio)
+            logger.info(
+                "atepp_min_match_ratio=%.2f: %d/%d ATEPP pieces clear threshold (csv=%s)",
+                atepp_min_match_ratio, n_pass, len(atepp_quality), csv_path,
+            )
+        else:
+            logger.warning(
+                "atepp_min_match_ratio set but %s missing — generate via "
+                "`python -m features.atepp_quality`. Filter is INACTIVE.",
+                csv_path,
+            )
+            atepp_min_match_ratio = None  # disable
+
     skipped_no_xml = 0
     skipped_filtered = 0
+    skipped_atepp_quality = 0
     with h5py.File(hdf5_path, "r") as hdf5_file:
         for group_name in tqdm(hdf5_file):
             group = hdf5_file[group_name]
@@ -486,6 +517,17 @@ def load_data_from_hdf5(
             if include_xml_features and "xml_features" not in group:
                 skipped_no_xml += 1
                 continue
+            # ATEPP-only quality gate
+            if atepp_min_match_ratio is not None and group_name.startswith("ATEPP_"):
+                pn = _decode(np.array(group["piece_name"])[0])
+                # piece_name in hdf5 is the segment id like "11604" (or with "_mixup")
+                pn_lookup = pn.split("_mixup")[0]
+                ratio = atepp_quality.get(pn_lookup) if atepp_quality else None
+                if ratio is None or (ratio != ratio):  # missing or NaN
+                    pass  # keep it; warned via the missing-csv path
+                elif ratio < atepp_min_match_ratio:
+                    skipped_atepp_quality += 1
+                    continue
 
             p_codec = np.array(group["p_codec"])
             s_codec = np.array(group["s_codec"])
@@ -523,6 +565,11 @@ def load_data_from_hdf5(
         logger.warning(
             "skipped %d groups missing xml_features — re-run features/augment_hdf5.py to fill",
             skipped_no_xml,
+        )
+    if atepp_min_match_ratio is not None and skipped_atepp_quality:
+        logger.info(
+            "atepp quality filter: skipped %d ATEPP groups below match_ratio=%.2f",
+            skipped_atepp_quality, atepp_min_match_ratio,
         )
     if dataset_filter and skipped_filtered:
         logger.info("skipped %d groups outside %s", skipped_filtered, list(dataset_filter))

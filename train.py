@@ -56,11 +56,16 @@ def main(cfg):
             list(OmegaConf.to_container(cfg.dataset_filter))
             if cfg.get("dataset_filter") else None
         )
+        # cfg.atepp_min_match_ratio (0..1): drop ATEPP pieces with parangonar
+        # match-ratio below this threshold. ASAP / VIENNA422 are unaffected.
+        # Requires data/atepp_match_ratios.csv from `python -m features.atepp_quality`.
+        atepp_min_match_ratio = cfg.get("atepp_min_match_ratio")
         train_set, valid_set = load_data_from_hdf5(
             hdf5_path,
             path_remap=path_remap,
             include_xml_features=include_xml_features,
             dataset_filter=dataset_filter,
+            atepp_min_match_ratio=atepp_min_match_ratio,
         )
 
     random.shuffle(train_set)

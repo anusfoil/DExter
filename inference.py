@@ -25,11 +25,43 @@ def main(cfg):
     os.environ['CUDA_VISIBLE_DEVICES'] = str(cfg.gpus[0])
     os.system("wandb sync --clean-force --clean-old-hours 3")
 
-    score = pt.load_musicxml(cfg.score_path)
+    score = pt.load_musicxml(cfg.score_path, force_note_ids='keep')
 
-    sna = score.note_array()
-    s_codec = torch.tensor(rfn.structured_to_unstructured(
-        sna[['onset_div', 'duration_div', 'pitch', 'voice']]))
+    # Build s_codec at the width the loaded checkpoint expects.
+    # If cfg.include_xml_features is set, extract the 15 xml-derived columns
+    # (articulation / slur / dynamic / wedge progress / expected_bpm / pedal /
+    # ...) so v2 inference matches the training feature layout. cfg.target_bpm,
+    # if set, overrides the score-derived expected_bpm column with the user's
+    # requested anchor — model treats the new anchor as score conditioning, so
+    # articulation and timing decisions are made *consistent with* that tempo
+    # (not just a post-hoc rescale of the predicted curve).
+    sna = score.parts[0].note_array(
+        include_pitch_spelling=True,
+        include_key_signature=True,
+        include_time_signature=True,
+        include_metrical_position=True,
+        include_grace_notes=True,
+        include_staff=True,
+        include_divs_per_quarter=True,
+    )
+    base = rfn.structured_to_unstructured(
+        sna[['onset_div', 'duration_div', 'pitch', 'voice']]
+    ).astype(np.float32)
+
+    if cfg.get("include_xml_features", False):
+        from features.xml_features import extract_xml_features, FEATURE_SPEC
+        feats = extract_xml_features(score, sna)
+        xml_cols = np.stack(
+            [feats[name].astype(np.float32) for name, _, _ in FEATURE_SPEC],
+            axis=-1,
+        )
+        if cfg.get("target_bpm"):
+            ebpm_idx = next(i for i, (n, _, _) in enumerate(FEATURE_SPEC) if n == "expected_bpm")
+            print(f"[inference] override expected_bpm column → {cfg.target_bpm} BPM")
+            xml_cols[:, ebpm_idx] = float(cfg.target_bpm)
+        s_codec = torch.tensor(np.concatenate([base, xml_cols], axis=-1))
+    else:
+        s_codec = torch.tensor(base)
 
     s_codec_tensor = []
     for idx in range(0, len(s_codec) - cfg.overlap, cfg.seg_len - cfg.overlap):  

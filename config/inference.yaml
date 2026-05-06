@@ -14,6 +14,17 @@ train_target: 'gen_noise'
 score_path: example_pieces/Bach_fugue_870.musicxml
 output_path: inference_out/test.mid
 
+# v2 options (ignored by v1 ClassifierFreeDenoiser checkpoints).
+# include_xml_features=True must match the training-time setting of the
+# checkpoint being loaded — v2 was trained on a 19-D s_codec.
+include_xml_features: False
+# target_bpm: optional user-supplied tempo anchor in BPM. When set, overrides
+# the score-derived expected_bpm column so the model renders with the supplied
+# tempo as its expectation (model treats it as score conditioning, so
+# articulation and timing choices follow). Set to null to use the score's own
+# marking (or 0 if the score has none).
+target_bpm: null
+
 
 test:
     sample_steps_frac: 1

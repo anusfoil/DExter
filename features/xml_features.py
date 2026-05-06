@@ -105,6 +105,64 @@ TEMPO_KIND_VOCAB = {
 }
 
 
+# Canonical BPM lookup for Italian tempo words. Values are the conventional
+# midpoint of each term's accepted range (per common reference tables) and are
+# used as a fallback when the score doesn't carry an explicit numeric tempo
+# (the more common case in classical scores). Lowercase keys; partitura's
+# `text` attribute is already lowercased.
+TEMPO_BPM_CANONICAL = {
+    # very slow
+    "larghissimo":   30,
+    "grave":         35,
+    "largo":         50,
+    "lento":         53,
+    "larghetto":     63,
+    "adagio":        60,
+    "adagietto":     67,
+    # walking
+    "andante":       92,
+    "andantino":     94,
+    "moderato":     114,
+    "allegretto":   110,
+    # fast
+    "allegro":      138,
+    "allegro moderato": 120,
+    "vivace":       166,
+    "vivo":         166,
+    "presto":       184,
+    "prestissimo":  220,
+}
+
+
+def _resolve_tempo_bpm(direction: ps.Direction) -> float:
+    """Map a tempo direction to a numeric BPM.
+
+    Priority:
+      1. partitura's parsed numeric ``bpm`` attribute (set when the score has
+         an explicit ``<sound tempo="X">`` or ``<metronome>`` mark).
+      2. Canonical lookup of the lowercased ``text`` (e.g. "allegro" → 138).
+      3. Substring lookup in ``raw_text`` for compound markings like
+         "Allegro molto" — falls back to first matched canonical word.
+      4. ``0.0`` if nothing resolves; consumer can treat as "unknown".
+
+    Modifier-aware tweaks (e.g. "molto" speeds up, "non troppo" slows down)
+    are intentionally NOT applied — first-pass we only need a coarse anchor.
+    """
+    bpm = getattr(direction, "bpm", None)
+    if isinstance(bpm, (int, float)) and bpm > 0:
+        return float(bpm)
+
+    text = (getattr(direction, "text", None) or "").strip().lower()
+    if text in TEMPO_BPM_CANONICAL:
+        return float(TEMPO_BPM_CANONICAL[text])
+
+    raw = (getattr(direction, "raw_text", None) or "").strip().lower()
+    for word, value in TEMPO_BPM_CANONICAL.items():
+        if word in raw:
+            return float(value)
+    return 0.0
+
+
 # ---------------------------------------------------------------------------
 # Direction span helpers
 # ---------------------------------------------------------------------------
@@ -116,6 +174,7 @@ class _Span:
     end: int             # divs (may equal start for instantaneous marks)
     label: str           # e.g. "p", "crescendo", "lento"
     kind: str            # one of TEMPO_KIND_VOCAB / loudness kind
+    bpm: float = 0.0     # numeric tempo target (only set for constant tempos)
 
 
 def _direction_to_span(d: ps.Direction, kind: str) -> _Span | None:
@@ -163,9 +222,37 @@ def _collect_tempo_spans(part: ps.Part) -> list[_Span]:
             continue
         for d in part.iter_all(klass):
             sp = _direction_to_span(d, kind)
-            if sp is not None:
-                spans.append(sp)
+            if sp is None:
+                continue
+            if kind == "constant":
+                sp.bpm = _resolve_tempo_bpm(d)
+            spans.append(sp)
     return spans
+
+
+def _active_constant_tempo_bpm(t: int, tempo_spans: list[_Span]) -> float:
+    """Return the BPM of the most-recent ConstantTempoDirection at or before t.
+
+    A Reset/Increasing/Decreasing direction does not change the active BPM
+    target; we keep returning the previous Constant tempo's BPM until a new
+    Constant arrives. (For accel./rit. transitions we'd ideally interpolate
+    between two Constants, but that's a follow-up.)
+
+    A constant span with ``bpm == 0`` (unparseable text, e.g. composer-
+    invented Italian like "agitato e maestoso") does NOT overwrite the
+    previously active BPM — we fall through to whatever tempo we last knew.
+    Treating 0 as "unknown / keep prior" matches musical intent: a marking
+    we can't map to a BPM is a refinement, not a tempo change.
+    """
+    bpm = 0.0
+    for s in tempo_spans:
+        if s.kind != "constant":
+            continue
+        if s.start > t:
+            break
+        if s.bpm > 0:
+            bpm = s.bpm
+    return bpm
 
 
 def _collect_pedal_spans(part: ps.Part) -> list[_Span]:
@@ -311,31 +398,16 @@ def extract_xml_features(
         "in_dim":               np.zeros(N, dtype=np.int32),
         "dim_progress":         np.zeros(N, dtype=np.float32),
         "active_tempo_kind_id": np.zeros(N, dtype=np.int32),
+        "expected_bpm":         np.zeros(N, dtype=np.float32),
         "pedal_down":           np.zeros(N, dtype=np.int32),
     }
 
     for i, row in enumerate(note_array):
-        nid = row["id"]
-        note = note_by_id.get(nid)
-        if note is None:
-            # row exists in note_array but not in iter_all(Note) — rare; skip.
-            continue
-
-        # --- per-note categorical
-        if note.articulations:
-            feats["articulation_id"][i] = _vocab_get(
-                ARTICULATION_VOCAB, note.articulations[0]
-            )
-        if note.ornaments:
-            first_orn = next(iter(note.ornaments))
-            feats["ornament_id"][i] = _vocab_get(ORNAMENT_VOCAB, first_orn)
-        feats["slur_state_id"][i] = SLUR_VOCAB[_slur_state(note)]
-        feats["tie_state_id"][i]  = TIE_VOCAB[_tie_state(note)]
-        feats["has_fermata"][i]   = int(note.fermata is not None)
-        feats["is_grace"][i]      = int(getattr(note, "is_grace", False))
-        feats["in_tuplet"][i]     = int(bool(note.tuplet_starts) or bool(note.tuplet_stops))
-
-        # --- onset-time-scoped (look up active span at note's onset_div)
+        # --- onset-time-scoped features depend only on the row's onset_div,
+        # so compute them regardless of whether the row's id matches a Note
+        # in iter_all(). Skipping these for ID-mismatch rows (grace notes
+        # with auto-generated IDs, voice-overlap suffixes, etc.) leaves
+        # zeros that get mistaken for "no marking" downstream.
         t = int(row["onset_div"])
         cl = _active_span_at(t, constant_loud)
         if cl is not None:
@@ -351,8 +423,27 @@ def extract_xml_features(
         tp = _active_span_at(t, tempo_spans)
         if tp is not None:
             feats["active_tempo_kind_id"][i] = TEMPO_KIND_VOCAB.get(tp.kind, 0)
+        feats["expected_bpm"][i] = _active_constant_tempo_bpm(t, tempo_spans)
         ped = _active_span_at(t, pedal_spans)
         feats["pedal_down"][i] = int(ped is not None)
+
+        # --- per-note categorical features need a Note object lookup
+        nid = row["id"]
+        note = note_by_id.get(nid)
+        if note is None:
+            continue
+        if note.articulations:
+            feats["articulation_id"][i] = _vocab_get(
+                ARTICULATION_VOCAB, note.articulations[0]
+            )
+        if note.ornaments:
+            first_orn = next(iter(note.ornaments))
+            feats["ornament_id"][i] = _vocab_get(ORNAMENT_VOCAB, first_orn)
+        feats["slur_state_id"][i] = SLUR_VOCAB[_slur_state(note)]
+        feats["tie_state_id"][i]  = TIE_VOCAB[_tie_state(note)]
+        feats["has_fermata"][i]   = int(note.fermata is not None)
+        feats["is_grace"][i]      = int(getattr(note, "is_grace", False))
+        feats["in_tuplet"][i]     = int(bool(note.tuplet_starts) or bool(note.tuplet_stops))
 
     return feats
 
@@ -372,5 +463,6 @@ FEATURE_SPEC = [
     ("in_dim",               "binary",      2),
     ("dim_progress",         "continuous",  None),
     ("active_tempo_kind_id", "categorical", len(TEMPO_KIND_VOCAB)),
+    ("expected_bpm",         "continuous",  None),
     ("pedal_down",           "binary",      2),
 ]
