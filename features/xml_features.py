@@ -399,7 +399,23 @@ def extract_xml_features(
         "dim_progress":         np.zeros(N, dtype=np.float32),
         "active_tempo_kind_id": np.zeros(N, dtype=np.int32),
         "expected_bpm":         np.zeros(N, dtype=np.float32),
-        "pedal_down":           np.zeros(N, dtype=np.int32),
+        # --- metrical / key / time-signature context (from note_array) ---
+        # The model previously had no awareness of which beat a note sits on,
+        # what meter is in effect, or what key the music is in — all things a
+        # human performer factors into expression decisions (downbeats get
+        # agogic weight, 3/4 vs 4/4 affect rhythmic feel, modulations cue
+        # rubato).
+        "is_downbeat":            np.zeros(N, dtype=np.int32),
+        "rel_onset_in_measure":   np.zeros(N, dtype=np.float32),
+        "ts_beats":               np.zeros(N, dtype=np.int32),
+        "ts_beat_type":           np.zeros(N, dtype=np.int32),
+        "ks_fifths":              np.zeros(N, dtype=np.int32),
+        "ks_mode":                np.zeros(N, dtype=np.int32),
+        # NOTE: score-side `pedal_down` was removed as a feature. Score pedal
+        # markings ("Ped...*", `<sustain>` directions) are coarse, often
+        # idealized, and bear little relationship to actual pedal usage —
+        # pianists pedal continuously / fractionally / by ear regardless of
+        # what the score says.
     }
 
     for i, row in enumerate(note_array):
@@ -424,8 +440,23 @@ def extract_xml_features(
         if tp is not None:
             feats["active_tempo_kind_id"][i] = TEMPO_KIND_VOCAB.get(tp.kind, 0)
         feats["expected_bpm"][i] = _active_constant_tempo_bpm(t, tempo_spans)
-        ped = _active_span_at(t, pedal_spans)
-        feats["pedal_down"][i] = int(ped is not None)
+
+        # --- metrical / key / time-signature: read directly from note_array
+        # (require include_metrical_position=True, include_key_signature=True,
+        # include_time_signature=True when calling note_array; the cache
+        # already does this).
+        if "is_downbeat" in row.dtype.names:
+            feats["is_downbeat"][i] = int(row["is_downbeat"])
+            tot = int(row["tot_measure_div"])
+            feats["rel_onset_in_measure"][i] = (
+                float(row["rel_onset_div"]) / tot if tot > 0 else 0.0
+            )
+        if "ts_beats" in row.dtype.names:
+            feats["ts_beats"][i]     = int(row["ts_beats"])
+            feats["ts_beat_type"][i] = int(row["ts_beat_type"])
+        if "ks_fifths" in row.dtype.names:
+            feats["ks_fifths"][i] = int(row["ks_fifths"])
+            feats["ks_mode"][i]   = int(row["ks_mode"])
 
         # --- per-note categorical features need a Note object lookup
         nid = row["id"]
@@ -464,5 +495,12 @@ FEATURE_SPEC = [
     ("dim_progress",         "continuous",  None),
     ("active_tempo_kind_id", "categorical", len(TEMPO_KIND_VOCAB)),
     ("expected_bpm",         "continuous",  None),
-    ("pedal_down",           "binary",      2),
+    # metrical / key / time-signature
+    ("is_downbeat",          "binary",      2),
+    ("rel_onset_in_measure", "continuous",  None),
+    ("ts_beats",             "continuous",  None),
+    ("ts_beat_type",         "continuous",  None),
+    ("ks_fifths",            "continuous",  None),
+    ("ks_mode",              "binary",      2),
+    # pedal_down intentionally absent — see docstring above.
 ]

@@ -536,6 +536,15 @@ def load_data_from_hdf5(
                 # that would be truncated to 0 if cast to s_codec's int dtype.
                 # Promote both to float32 for the concat.
                 xml_features = np.array(group["xml_features"], dtype=np.float32)
+                # xml_features in HDF5 may be stored with the older 15-col
+                # schema that included a trailing pedal_down column. We dropped
+                # pedal_down from FEATURE_SPEC because score-pedal markings
+                # don't correspond to actual pedal use — keep only the columns
+                # currently in FEATURE_SPEC (always the leading slice).
+                from features.xml_features import FEATURE_SPEC
+                n_keep = len(FEATURE_SPEC)
+                if xml_features.shape[-1] > n_keep:
+                    xml_features = xml_features[..., :n_keep]
                 s_codec = np.concatenate(
                     [s_codec.astype(np.float32, copy=False), xml_features],
                     axis=-1,
