@@ -315,6 +315,7 @@ class CodecDiffusion(pl.LightningModule):
             pcodec_pred = p_codec_scale(pcodec_pred, self.hparams.dataset_means, self.hparams.dataset_stds)
 
             tempo_vel_loss, tempo_vel_cor = 0, 0
+            tc_fig = None
             if len(pcodec_pred) % 2 != 1:
                 tc_fig, tempo_vel_loss, tempo_vel_cor = self.render_batch(
                     pcodec_pred, batch_source, batch_label, save_root_, evaluate=evaluate)
@@ -347,7 +348,8 @@ class CodecDiffusion(pl.LightningModule):
         self.logger.log_image(key=f"Val/pred_label", images=[fig])
         plt.savefig(f"{save_root}/pred_label.png")
         plt.close(fig)
-        plt.close(tc_fig)
+        if tc_fig is not None:
+            plt.close(tc_fig)
         plt.close('all')
 
         sampled_loss = self.p_losses(batch_label_codec, torch.tensor(pcodec_pred), loss_type='l2')
