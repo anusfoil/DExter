@@ -63,9 +63,14 @@ def _maybe_unfold(score: ps.Score, sample_id: str) -> ps.Score:
     return score
 
 
-def _build_metrical_lookup(score: ps.Score) -> dict[str, tuple]:
-    """Map note_id → (is_downbeat, rel_in_meas, ts_beats, ts_bt, ks_fif, ks_mode)."""
-    sna = score.parts[0].note_array(
+def _build_metrical_lookup(score) -> dict[str, tuple]:
+    """Map note_id → (is_downbeat, rel_in_meas, ts_beats, ts_bt, ks_fif, ks_mode).
+
+    ``score`` may be either a ``ps.Score`` (untouched MusicXML) or a
+    ``ps.Part`` (returned by ``unfold_part_maximal``); handle both.
+    """
+    part = score.parts[0] if hasattr(score, "parts") and getattr(score, "parts", None) else score
+    sna = part.note_array(
         include_pitch_spelling=True,
         include_key_signature=True,
         include_time_signature=True,
