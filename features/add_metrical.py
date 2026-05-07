@@ -173,10 +173,10 @@ def _build_argparser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser()
     p.add_argument("--hdf5", required=True)
     p.add_argument("--errors", default="data/metrical_errs.jsonl")
-    p.add_argument("--datasets-root-from", default=None,
-                   help="if HDF5 has paths from a different machine, the source prefix")
-    p.add_argument("--datasets-root-to", default=None,
-                   help="local prefix to substitute")
+    p.add_argument("--remap", action="append", default=[],
+                   help="prefix substitution as 'old=new', repeatable. Use for "
+                        "both Datasets root and DExter_/data root since HDF5 "
+                        "embeds absolute paths from the regen machine.")
     return p
 
 
@@ -184,11 +184,15 @@ def main() -> None:
     args = _build_argparser().parse_args()
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s [%(levelname)s] %(message)s")
-    path_remap = None
-    if args.datasets_root_from and args.datasets_root_to:
-        path_remap = {args.datasets_root_from: args.datasets_root_to}
+    path_remap: dict[str, str] = {}
+    for entry in args.remap:
+        if "=" not in entry:
+            raise SystemExit(f"--remap '{entry}' missing '=' separator")
+        old, new = entry.split("=", 1)
+        path_remap[old] = new
     Path(args.errors).parent.mkdir(parents=True, exist_ok=True)
-    add_metrical(Path(args.hdf5), Path(args.errors), path_remap=path_remap)
+    add_metrical(Path(args.hdf5), Path(args.errors),
+                 path_remap=path_remap or None)
 
 
 if __name__ == "__main__":
