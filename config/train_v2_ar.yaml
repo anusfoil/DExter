@@ -1,0 +1,87 @@
+# DExter v2 — AR-context training config.
+# - seg_len 2000 (longer windows for full-piece coherence within one chunk)
+# - K=320 (same 16% DCT bandwidth ratio as winning K=32/N=200)
+# - enable_prior_context=True: model gets prior_features (B, T, F_p+1) — clean
+#   p_codec for a random prefix at training time; previous chunk's last-K
+#   predicted notes at inference time. Lets full-song generation stitch chunks
+#   coherently rather than producing seam discontinuities.
+
+defaults:
+  - model: V2Model_ar
+  - task: classifierfree_diffusion
+  - _self_
+
+gpus: 4               # device list set via CUDA_VISIBLE_DEVICES in run script
+val_freq: 50
+learning_rate: 5e-5
+epochs: 1000
+download: False
+load_trained: False
+test_only: False
+data_root: ./data
+seg_len: 2000
+pin_memory: True
+random_seed: 13
+condition_eval: False
+drop_c_con: True
+
+train_target: 'gen_noise'
+
+# v2 data loading
+include_xml_features: true       # 24-D rich s_codec
+atepp_min_match_ratio: 0.9       # cleanest 11% of ATEPP
+# dataset_filter: null           # ASAP + ATEPP-q90 + VIENNA422
+
+# Cap val batches that get the full-song render (cheap vals; no OOM cliff).
+valid_n_batches: 3
+
+# Optional cross-host path remap; populate when running on a different machine.
+# path_remap:
+#   /Users/huanz/01Acdemics/PhD/Research/Datasets/: /lambda/.../data/
+#   /Users/huanz/01Acdemics/PhD/Research/DExter_/data/snote_ids/: /home/ubuntu/DExter/data/snote_ids/
+
+test:
+    sample_steps_frac: 1
+    transfer: False
+
+dataloader:
+    smoothed: False
+    mixup: True
+    train:
+        batch_size: 64           # smaller per-GPU batch for K=320 (10x attention cost vs K=32)
+        num_workers: 16
+        shuffle: True
+        pin_memory: ${pin_memory}
+        prefetch_factor: 2
+        persistent_workers: True
+    val:
+        batch_size: 8
+        num_workers: 2
+        shuffle: True
+        pin_memory: ${pin_memory}
+
+trainer:
+    gpus: ${gpus}
+    max_epochs: ${epochs}
+    check_val_every_n_epoch: ${val_freq}
+    strategy: ddp
+
+modelcheckpoint:
+    monitor: 'Val/tempo_vel_loss'
+    filename: '{epoch:02d}e-tv_loss{Train/tv_loss:.2f}'
+    save_top_k: 1
+    save_last: True
+    mode: "min"
+    auto_insert_metric_name: False
+
+# AR-context-specific knobs threaded through to HierarchicalCodecDiffusion.
+# These live under task.* so the Lightning module can read them via hparams.
+task:
+  enable_prior_context: true
+  prior_max_prefix_frac: 0.25      # max prefix length as fraction of seg_len
+  prior_dropout: 0.5               # 50% chance no prior at all (cold start)
+
+hydra:
+  output_subdir: null
+  run:
+    dir: .

@@ -25,6 +25,13 @@ include_xml_features: False
 # marking (or 0 if the score has none).
 target_bpm: null
 
+# enable_prior_context: if True the model expects a prior_features (B, T, F_p+1)
+# tensor per chunk holding the previous chunk's last `overlap` predicted notes
+# (plus a 0/1 mask). Inference runs chunks SEQUENTIALLY (not batched) so each
+# chunk N depends on chunk N-1's output. Must match the training-time setting
+# of the loaded checkpoint.
+enable_prior_context: False
+
 
 test:
     sample_steps_frac: 1

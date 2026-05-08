@@ -71,6 +71,9 @@ class HierarchicalCodecDiffusion(CodecDiffusion):
         target_transform: str = "identity",
         target_keep_low_k: int | None = None,
         transform_score_codec: bool = True,
+        enable_prior_context: bool = False,
+        prior_max_prefix_frac: float = 0.25,
+        prior_dropout: float = 0.5,
         **kwargs,
     ):
         # Don't consume seg_len / p_codec_rows / s_codec_rows here — they're
@@ -79,6 +82,9 @@ class HierarchicalCodecDiffusion(CodecDiffusion):
         super().__init__(*args, **kwargs)
         self._target_transform_kind = target_transform
         self._transform_score_codec = transform_score_codec
+        self._enable_prior_context = enable_prior_context
+        self._prior_max_prefix_frac = prior_max_prefix_frac
+        self._prior_dropout = prior_dropout
 
         # The denoiser parent class stores these on hparams via Lightning's
         # save_hyperparameters() machinery (or directly).
@@ -120,6 +126,49 @@ class HierarchicalCodecDiffusion(CodecDiffusion):
             return s_codec_btF
         return self.s_target_transform.transform(s_codec_btF.float())
 
+    def _compute_prior_features(
+        self,
+        p_codec: torch.Tensor,
+        batch: dict | None,
+        device: torch.device,
+    ) -> torch.Tensor:
+        """Build per-note prior context features (B, T, F_p + 1).
+
+        Layout: first F_p columns hold the (clean) p_codec for the prefix
+        positions and zeros elsewhere. Final column is a binary mask flagging
+        which positions are "known". The model conditions on this so it can
+        continue smoothly from a previous chunk's prediction.
+
+        Training: random prefix length per sample in [0, T*prior_max_prefix_frac];
+        with probability prior_dropout, no prefix at all (model still learns
+        to generate from scratch). This is roughly the BERT-style random-mask
+        scheme adapted to autoregressive chunk continuation.
+
+        Validation / inference: the caller supplies ``batch['prior_features']``
+        of shape (B, T, F_p + 1). If absent, returns all zeros (cold start).
+        """
+        B, T, F_p = p_codec.shape
+        if not self.training and batch is not None and batch.get("prior_features") is not None:
+            return batch["prior_features"].to(device).float()
+
+        # Training: build a random prefix mask
+        if not self.training:
+            # validation w/o supplied prior — use zeros (unconditional)
+            return torch.zeros(B, T, F_p + 1, device=device, dtype=torch.float32)
+
+        max_prefix = max(1, int(T * self._prior_max_prefix_frac))
+        prefix_lens = torch.randint(0, max_prefix + 1, (B,), device=device)
+        # Drop the prior entirely with probability prior_dropout — keeps the
+        # model usable for cold starts (chunk 0 of any piece, or "from scratch"
+        # generation) where no prior exists.
+        keep = torch.rand(B, device=device) >= self._prior_dropout
+        prefix_lens = torch.where(keep, prefix_lens, torch.zeros_like(prefix_lens))
+
+        idx = torch.arange(T, device=device).unsqueeze(0).expand(B, T)
+        mask = (idx < prefix_lens.unsqueeze(1)).float()           # (B, T)
+        prior_pcodec = p_codec * mask.unsqueeze(-1)               # (B, T, F_p)
+        return torch.cat([prior_pcodec, mask.unsqueeze(-1)], dim=-1)  # (B, T, F_p+1)
+
     # --------------------------------------------------------------- training
 
     def step(self, batch, batch_idx):
@@ -141,6 +190,18 @@ class HierarchicalCodecDiffusion(CodecDiffusion):
             c_codec_coef = self.s_target_transform.transform(c_codec.float())
         else:
             c_codec_coef = c_codec
+
+        # AR-context prior: optional per-note prefix conditioning. Concatenated
+        # to s_codec_coef on the feature axis so the model sees it through the
+        # existing score-codec input pathway (no architecture changes needed,
+        # just a wider input projection).
+        if self._enable_prior_context:
+            prior_features = self._compute_prior_features(p_codec, batch, device)
+            if self.s_target_transform is not None:
+                prior_features_coef = self.s_target_transform.transform(prior_features.float())
+            else:
+                prior_features_coef = prior_features.float()
+            s_codec_coef = torch.cat([s_codec_coef, prior_features_coef], dim=-1)
 
         batch_size = p_coef.shape[0]
 
@@ -223,6 +284,18 @@ class HierarchicalCodecDiffusion(CodecDiffusion):
             c_codec_coef = self.s_target_transform.transform(c_codec.float())
         else:
             c_codec_coef = c_codec
+
+        # AR-context prior at sampling: caller (inference.py for full-song
+        # generation) supplies batch['prior_features'] of shape (B, T, F_p+1)
+        # — first F_p cols are the previous chunk's last-K' predicted p_codec,
+        # final col is a 0/1 mask. For chunk 0 of a piece this should be zeros.
+        if self._enable_prior_context:
+            prior_features = self._compute_prior_features(p_codec, batch, p_codec.device)
+            if self.s_target_transform is not None:
+                prior_features_coef = self.s_target_transform.transform(prior_features.float())
+            else:
+                prior_features_coef = prior_features.float()
+            s_codec_coef = torch.cat([s_codec_coef, prior_features_coef], dim=-1)
 
         if hasattr(self, "inner_loop"):
             self.inner_loop.refresh()

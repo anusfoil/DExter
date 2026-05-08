@@ -88,20 +88,42 @@ def main(cfg):
     with torch.no_grad():
         model.to(device)
 
-        c_codec = torch.zeros(s_codec_tensor.size(0), s_codec_tensor.size(1), 7)
-        batch = {
-            'p_codec': torch.zeros(s_codec_tensor.shape[0], s_codec_tensor.shape[1], 5), # (B, T, F)
-            's_codec': s_codec_tensor.to(device),  
-            'c_codec': c_codec.to(device)   
-        }
-        
-        p_codec_pred = model.inference_one(batch)
+        # AR-context aware chunking. When the loaded checkpoint was trained
+        # with enable_prior_context=True, the model expects an extra
+        # (F_p + 1)-channel "prior_features" input that holds the previous
+        # chunk's last `overlap` predicted notes (plus a 0/1 mask). For
+        # chunk 0 this is all zeros (cold start). Each subsequent chunk
+        # depends on the previous one, so we sample sequentially rather
+        # than batch all chunks together as the v1 path did.
+        ar_context = bool(cfg.get("enable_prior_context", False))
+        F_p = 5
+        F_c = 7
+        n_chunks, T, _ = s_codec_tensor.shape
+        chunk_preds: list[np.ndarray] = []
 
-    # connect the codecs back into one for inferencing
+        for i in tqdm(range(n_chunks), desc="AR chunks" if ar_context else "chunks"):
+            chunk_s = s_codec_tensor[i:i+1].to(device)            # (1, T, F_s)
+            batch = {
+                'p_codec': torch.zeros(1, T, F_p, device=device),
+                's_codec': chunk_s,
+                'c_codec': torch.zeros(1, T, F_c, device=device),
+            }
+            if ar_context:
+                prior = torch.zeros(1, T, F_p + 1, device=device)
+                if i > 0 and chunk_preds:
+                    overlap = cfg.overlap
+                    prev = torch.tensor(chunk_preds[-1][0], device=device, dtype=torch.float32)
+                    prior[0, :overlap, :F_p] = prev[-overlap:]
+                    prior[0, :overlap, F_p:] = 1.0
+                batch['prior_features'] = prior
+
+            pred = model.inference_one(batch)                     # (1, 1, T, F_p)
+            chunk_preds.append(pred.cpu().numpy() if isinstance(pred, torch.Tensor) else pred)
+
+    # Stitch chunks back together with overlap-averaging.
     accumulated_preds = np.zeros((len(s_codec)+cfg.seg_len, 5), dtype=np.float32)
-
     start_idx = 0
-    for pred in p_codec_pred:
+    for pred in chunk_preds:
         accumulated_preds[start_idx:start_idx+cfg.seg_len] += pred[0]
         if start_idx != 0:
             accumulated_preds[start_idx:start_idx+cfg.overlap] /= 2
